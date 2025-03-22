@@ -205,3 +205,54 @@ class PortfolioVisualizer:
         fig.show()
         
         return fig
+
+    def display_miscellaneous_stocks(self):
+        """Create a visualization for stocks categorized in the Miscellaneous sector"""
+        df = self.portfolio_df.copy()
+        
+        # Filter for stocks in Miscellaneous sector
+        misc_stocks = df[df['sector'] == 'Miscellaneous']
+        
+        if misc_stocks.empty:
+            print("No stocks found in Miscellaneous sector")
+            return None
+            
+        # Sort by equity value
+        misc_stocks = misc_stocks.sort_values('equity', ascending=False)
+        
+        # Create bar chart
+        fig = px.bar(
+            misc_stocks,
+            x=misc_stocks.index,
+            y='equity',
+            title='Miscellaneous Sector Holdings',
+            hover_data=['name', 'portfolio_percentage', 'quantity', 'price', 'asset_type'],
+            labels={'equity': 'Value ($)', 'index': 'Symbol'}
+        )
+        
+        fig.update_layout(
+            title_font_size=24,
+            showlegend=True,
+            xaxis_tickangle=-45
+        )
+        
+        # Save interactive HTML
+        output_path = self.output_dir / "miscellaneous_sector_holdings.html"
+        fig.write_html(str(output_path))
+        print(f"Saved miscellaneous sector holdings visualization to {output_path}")
+        
+        # Display the chart
+        fig.show()
+        
+        # Print detailed information
+        print("\nDetailed Miscellaneous Sector Holdings:")
+        print("=====================================")
+        for symbol, row in misc_stocks.iterrows():
+            print(f"{symbol} ({row['name']}):")
+            print(f"  Value: ${row['equity']:.2f}")
+            print(f"  Quantity: {row['quantity']}")
+            print(f"  Current Price: ${row['price']:.2f}")
+            print(f"  Portfolio %: {row['portfolio_percentage']:.2f}%")
+            print("-------------------------------------")
+        
+        return fig
