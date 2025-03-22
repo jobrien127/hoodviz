@@ -51,8 +51,21 @@ def get_portfolio_data():
         if col in stocks_df.columns:
             stocks_df[col] = pd.to_numeric(stocks_df[col])
     
-    # Add asset type
+    # Add asset type and fetch sector information for stocks
     stocks_df['asset_type'] = 'stock'
+    
+    # Fetch sector information for each stock
+    sectors = {}
+    for symbol in stocks_df.index:
+        try:
+            fundamentals = rh.get_fundamentals(symbol)[0]
+            sectors[symbol] = fundamentals.get('sector', 'Unknown')
+        except Exception as e:
+            print(f"Could not fetch sector for {symbol}: {e}")
+            sectors[symbol] = 'Unknown'
+    
+    # Add sector information to DataFrame
+    stocks_df['sector'] = pd.Series(sectors)
     
     # Get crypto positions
     try:
@@ -76,7 +89,8 @@ def get_portfolio_data():
                     'quantity': quantity,
                     'equity': equity,
                     'name': position['currency']['name'],
-                    'asset_type': 'crypto'
+                    'asset_type': 'crypto',
+                    'sector': 'Cryptocurrency'  # Add sector for crypto
                 }
         
         # Convert to DataFrame
@@ -90,6 +104,21 @@ def get_portfolio_data():
     except Exception as e:
         print(f"Error fetching crypto positions: {e}")
         portfolio_df = stocks_df
+    
+    # Classify stocks into asset types based on market cap
+    for symbol in portfolio_df[portfolio_df['asset_type'] == 'stock'].index:
+        try:
+            fundamentals = rh.get_fundamentals(symbol)[0]
+            market_cap = float(fundamentals.get('market_cap', 0))
+            
+            if market_cap >= 10e9:  # $10 billion or more
+                portfolio_df.at[symbol, 'asset_type'] = 'Large Cap'
+            elif market_cap >= 2e9:  # $2 billion to $10 billion
+                portfolio_df.at[symbol, 'asset_type'] = 'Mid Cap'
+            else:
+                portfolio_df.at[symbol, 'asset_type'] = 'Small Cap'
+        except Exception as e:
+            print(f"Could not determine market cap for {symbol}: {e}")
     
     return portfolio_df
 

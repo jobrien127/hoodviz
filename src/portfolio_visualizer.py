@@ -169,3 +169,39 @@ class PortfolioVisualizer:
         fig.show()
         
         return fig
+
+    def sector_breakdown_large_cap(self):
+        """Create a pie chart visualization of large cap holdings by sector"""
+        # Filter for large cap holdings and group by sector
+        df = self.portfolio_df.copy()
+        large_cap_df = df[df['asset_type'] == 'Large Cap']
+        df_by_sector = large_cap_df.groupby('sector')['equity'].sum().reset_index()
+        total = df_by_sector['equity'].sum()
+        df_by_sector['percentage'] = (df_by_sector['equity'] / total) * 100
+        
+        # Create and save pie chart using Plotly
+        fig = px.pie(
+            df_by_sector,
+            values='equity',
+            names='sector',
+            title='Large Cap Holdings by Sector',
+            labels={'equity': 'Value ($)'},
+            hover_data=['percentage']
+        )
+        
+        fig.update_traces(textposition='inside', textinfo='percent+label')
+        fig.update_layout(
+            title_font_size=24,
+            legend_title_font_size=16,
+            legend_font_size=12
+        )
+        
+        # Save interactive HTML
+        output_path = self.output_dir / "large_cap_by_sector.html"
+        fig.write_html(str(output_path))
+        print(f"Saved large cap sector breakdown to {output_path}")
+        
+        # Display the chart
+        fig.show()
+        
+        return fig

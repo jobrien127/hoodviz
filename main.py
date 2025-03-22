@@ -56,6 +56,9 @@ def main():
         
         print("\n4. Creating bar chart of top holdings...")
         visualizer.bar_chart_top_holdings()
+
+        print("\n5. Creating sector breakdown for large cap holdings...")
+        visualizer.sector_breakdown_large_cap()
         
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         
