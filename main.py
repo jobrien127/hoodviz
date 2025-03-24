@@ -45,20 +45,25 @@ def main():
         print("\nGenerating visualizations...")
         visualizer = PortfolioVisualizer(portfolio_df)
         
-        print("\n1. Creating pie chart by symbol...")
+        # print("\n1. Creating portfolio metrics dashboard...")
+        # visualizer.portfolio_metrics_dashboard()
+        
+        print("\n2. Creating pie chart by symbol...")
         visualizer.pie_chart_by_symbol()
         
-        print("\n2. Creating pie chart by asset type...")
-        visualizer.pie_chart_by_asset_type()
+        # print("\n3. Creating pie chart by asset type...")
+        # visualizer.pie_chart_by_asset_type()
         
-        print("\n3. Creating treemap visualization...")
+        print("\n4. Creating treemap visualization...")
         visualizer.treemap_visualization()
         
-        print("\n4. Creating bar chart of top holdings...")
-        visualizer.bar_chart_top_holdings()
+        # print("\n5. Creating bar chart of top holdings...")
+        # visualizer.bar_chart_top_holdings()
 
-        print("\n5. Creating sector breakdown for large cap holdings...")
-        visualizer.sector_breakdown_large_cap()
+        # print("\n6. Creating sector breakdown for large cap holdings...")
+        # visualizer.sector_breakdown_large_cap()
+
+        # visualizer.display_miscellaneous_stocks()
         
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         
