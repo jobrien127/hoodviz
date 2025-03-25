@@ -15,6 +15,29 @@ class PortfolioVisualizer:
         self.portfolio_df = portfolio_df
         self.output_dir = Path(__file__).parent.parent / "visualizations"
         self.output_dir.mkdir(exist_ok=True)
+
+        # Display portfolio DataFrame
+        pd.set_option('display.max_rows', None)  # Show all rows
+        pd.set_option('display.max_columns', None)  # Show all columns
+        pd.set_option('display.width', None)  # Don't wrap wide columns
+        pd.set_option('display.float_format', lambda x: '%.5f' % x)  # Format floats to 20 decimal places
+        
+        print("\nDataFrame Information:")
+        print("=" * 80)
+        print("\nDataFrame Attributes:")
+        print(f"Shape: {portfolio_df.shape}")
+        print(f"Columns: {portfolio_df.columns.tolist()}")
+        # print(f"Index: {portfolio_df.index.tolist()}")
+        print(f"\nData Types:\n{portfolio_df.dtypes}")
+        # print("\nSample Data:")
+        # print(portfolio_df.head())
+        # print("\nDataFrame Description:")
+        # print(portfolio_df.describe())
+        
+        print("\nCurrent Portfolio Holdings:")
+        print("=" * 80)
+        print(portfolio_df)
+        print("\nTotal Portfolio Value: ${:,.5f}".format(portfolio_df['equity'].sum()))
         
         # Set dark theme configurations
         self.plotly_theme = "plotly_dark"
@@ -46,18 +69,26 @@ class PortfolioVisualizer:
             )
         )
         
-        # Ensure equity column is numeric
+        # Ensure equity column is numeric with appropriate precision
         if 'equity' in self.portfolio_df.columns:
             self.portfolio_df['equity'] = pd.to_numeric(self.portfolio_df['equity'])
+            # Apply precision based on type
+            crypto_mask = self.portfolio_df['type'] == 'crypto'
+            self.portfolio_df.loc[crypto_mask, 'equity'] = self.portfolio_df.loc[crypto_mask, 'equity'].round(20)
+            self.portfolio_df.loc[~crypto_mask, 'equity'] = self.portfolio_df.loc[~crypto_mask, 'equity'].round(2)
             
         # Calculate portfolio percentages
         self.calculate_percentages()
 
     def calculate_percentages(self):
         """Calculate percentage of portfolio for each holding"""
-        total_equity = self.portfolio_df['equity'].sum()
-        self.portfolio_df['portfolio_percentage'] = (self.portfolio_df['equity'] / total_equity) * 100
-        
+        total_equity = self.portfolio_df['equity'].sum().round(2)  # Total always in 2 decimals
+        self.portfolio_df['portfolio_percentage'] = (self.portfolio_df['equity'] / total_equity * 100)
+        # Round percentages based on asset type
+        crypto_mask = self.portfolio_df['type'] == 'crypto'
+        self.portfolio_df.loc[crypto_mask, 'portfolio_percentage'] = self.portfolio_df.loc[crypto_mask, 'portfolio_percentage'].round(20)
+        self.portfolio_df.loc[~crypto_mask, 'portfolio_percentage'] = self.portfolio_df.loc[~crypto_mask, 'portfolio_percentage'].round(2)
+
     def update_chart_layout(self, fig, additional_settings=None):
         """Helper method to apply default layout settings and any additional settings"""
         settings = self.default_layout.copy()
@@ -151,7 +182,6 @@ class PortfolioVisualizer:
         
         # Handle crypto assets and combine stocks/ADRs
         df.loc[df['type'].isin(['stock', 'adr']), 'type'] = 'stocks'  # Combine stocks and ADRs
-        df['equity_change'] = np.where(df['type'] == 'crypto', df['equity'] - df['price'] * df['quantity'], df['equity_change'])
         
         fig = px.treemap(
             df,
@@ -225,18 +255,18 @@ class PortfolioVisualizer:
             'height': 1200,
             'annotations': [
                 dict(
-                    text=f'Total ETP Value: ${etp_total:,.2f}',
+                    text=f'Total ETP Value: ${etp_total:.2f}',
                     x=0.225, y=-0.1,
                     showarrow=False,
                     font_size=14,
-                    font_color='#808080'  # Medium grey text
+                    font_color='#808080'
                 ),
                 dict(
-                    text=f'Total Stocks/ADRs Value: ${stocks_total:,.2f}',
+                    text=f'Total Stocks/ADRs Value: ${stocks_total:.2f}',
                     x=0.775, y=-0.1,
                     showarrow=False,
                     font_size=14,
-                    font_color='#808080'  # Medium grey text
+                    font_color='#808080'
                 )
             ]
         })

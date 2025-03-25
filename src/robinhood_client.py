@@ -91,40 +91,43 @@ def get_portfolio_data(force_refresh=False):
                 stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
                 stocks_df['type'] = stocks_df['type'].fillna('stock')  # Ensure stock type is set
                 
-            # Get crypto holdings
+            # Get crypto holdings with high precision
             crypto_positions = rh.get_crypto_positions()
             crypto_holdings = {}
             
             if crypto_positions:  # Check if positions exist
                 for position in crypto_positions:
                     try:
-                        quantity = float(position.get('quantity', 0))
+                        quantity = round(float(position.get('quantity', 0)), 20)
                         if quantity > 0:  # Only include non-zero positions
                             symbol = position.get('currency', {}).get('code')
                             if not symbol:
                                 continue
                                 
-                            # Get current crypto price
+                            # Get current crypto price with high precision
                             quote = rh.get_crypto_quote(symbol)
                             if quote and isinstance(quote, dict):
-                                price = float(quote.get('mark_price', 0))
-                                equity = quantity * price
+                                price = round(float(quote.get('mark_price', 0)), 20)
+                                equity = round(quantity * price, 20)
                                 
                                 cost_bases = position.get('cost_bases', [])
                                 avg_cost = 0
                                 if cost_bases and len(cost_bases) > 0:
-                                    direct_cost = float(cost_bases[0].get('direct_cost_basis', 0))
-                                    direct_quantity = float(cost_bases[0].get('direct_quantity', 1))
+                                    direct_cost = round(float(cost_bases[0].get('direct_cost_basis', 0)), 20)
+                                    direct_quantity = round(float(cost_bases[0].get('direct_quantity', 1)), 20)
                                     if direct_quantity > 0:
-                                        avg_cost = direct_cost / direct_quantity
-                                
+                                        avg_cost = round(direct_cost / direct_quantity, 20)
+
+                                print("Price:" , price, " Quantity:", quantity, " Equity:", equity, " Avg Cost:", avg_cost)
+
                                 crypto_holdings[symbol] = {
                                     'price': price,
                                     'quantity': quantity,
                                     'equity': equity,
                                     'name': position.get('currency', {}).get('name', symbol),
                                     'type': 'crypto',
-                                    'average_buy_price': avg_cost
+                                    'average_buy_price': avg_cost,
+                                    'equity_change': round(equity - (quantity * avg_cost), 20)
                                 }
                     except (TypeError, ValueError, KeyError) as e:
                         print(f"Error processing crypto position: {e}")
@@ -139,11 +142,16 @@ def get_portfolio_data(force_refresh=False):
                 print("No crypto positions found")
                 portfolio_df = stocks_df
                 
-            # Convert numeric columns
+            # Convert numeric columns - regular precision for stocks, high precision for crypto
             numeric_cols = ['price', 'quantity', 'average_buy_price', 'equity', 'percent_change', 'equity_change']
             for col in numeric_cols:
                 if col in portfolio_df.columns:
+                    # Convert to numeric first
                     portfolio_df[col] = pd.to_numeric(portfolio_df[col], errors='coerce')
+                    # Round crypto values to 20 decimal places, others to 2
+                    crypto_mask = portfolio_df['type'] == 'crypto'
+                    portfolio_df.loc[crypto_mask, col] = portfolio_df.loc[crypto_mask, col].round(20)
+                    portfolio_df.loc[~crypto_mask, col] = portfolio_df.loc[~crypto_mask, col].round(2)
             
             # Save to cache
             _save_to_cache(portfolio_df)
