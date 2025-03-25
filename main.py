@@ -61,13 +61,24 @@ def main():
         print("\n4. Creating treemap visualization...")
         visualizer.treemap_visualization()
 
-        print("\n4. Creating treemap performance visualization...")
+        print("\n5. Creating treemap performance visualization...")
         visualizer.treemap_perf_visualization()
 
-        print("\n5. Creating bar chart by symbol...")
+        print("\n6. Creating bar chart by symbol...")
         visualizer.bar_chart_by_symbol()
 
-        
+        print("\n7. Creating risk-return scatter plot...")
+        visualizer.risk_return_scatter()
+
+        print("\n8. Creating asset type distribution...")
+        visualizer.asset_type_distribution()
+
+        print("\n9. Creating portfolio weight changes...")
+        visualizer.portfolio_weight_changes()
+
+        print("\n10. Creating diversification score...")
+        visualizer.diversification_score()
+
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         
     except Exception as e:

@@ -371,3 +371,125 @@ class PortfolioVisualizer:
         print(f"Saved bar chart by symbol to {output_path}")
         fig.show()
         return fig
+
+    def risk_return_scatter(self):
+        """Create a scatter plot showing risk vs return for each holding"""
+        df = self.portfolio_df.copy()
+        
+        fig = px.scatter(
+            df,
+            x='percent_change',
+            y='portfolio_percentage',
+            text=df.index,
+            color='type',
+            size='equity',
+            title='Risk-Return Analysis',
+            labels={
+                'percent_change': 'Return (%)',
+                'portfolio_percentage': 'Portfolio Weight (%)',
+                'type': 'Asset Type'
+            },
+            template=self.plotly_theme
+        )
+        
+        self.update_chart_layout(fig, {
+            'title_font_size': 24,
+            'xaxis_title': 'Return (%)',
+            'yaxis_title': 'Portfolio Weight (%)'
+        })
+        
+        output_path = self.output_dir / "risk_return_scatter.html"
+        fig.write_html(str(output_path))
+        print(f"Saved risk-return scatter plot to {output_path}")
+        fig.show()
+        return fig
+
+    def asset_type_distribution(self):
+        """Create a sunburst chart showing distribution across asset types"""
+        df = self.portfolio_df.copy()
+        
+        # Calculate total value per asset type
+        type_totals = df.groupby('type')['equity'].sum().reset_index()
+        
+        fig = px.sunburst(
+            type_totals,
+            path=['type'],
+            values='equity',
+            title='Asset Type Distribution',
+            template=self.plotly_theme,
+            color_discrete_sequence=self.pie_colors
+        )
+        
+        self.update_chart_layout(fig, {
+            'title_font_size': 24
+        })
+        
+        output_path = self.output_dir / "asset_type_distribution.html"
+        fig.write_html(str(output_path))
+        print(f"Saved asset type distribution to {output_path}")
+        fig.show()
+        return fig
+
+    def portfolio_weight_changes(self):
+        """Create a waterfall chart showing how portfolio weights have changed"""
+        df = self.portfolio_df.copy()
+        
+        fig = go.Figure(go.Waterfall(
+            name="Portfolio Changes",
+            orientation="v",
+            measure=["relative"] * len(df),
+            x=df.index,
+            textposition="outside",
+            text=[f"{x:+.2f}%" for x in df['percent_change']],
+            y=df['equity_change'],
+            connector={"line": {"color": "rgb(63, 63, 63)"}},
+        ))
+        
+        self.update_chart_layout(fig, {
+            'title': 'Portfolio Weight Changes',
+            'title_font_size': 24,
+            'showlegend': False,
+            'xaxis_title': 'Holdings',
+            'yaxis_title': 'Change in Value ($)'
+        })
+        
+        output_path = self.output_dir / "portfolio_weight_changes.html"
+        fig.write_html(str(output_path))
+        print(f"Saved portfolio weight changes to {output_path}")
+        fig.show()
+        return fig
+
+    def diversification_score(self):
+        """Create a gauge chart showing portfolio diversification score"""
+        df = self.portfolio_df.copy()
+        
+        # Calculate Herfindahl-Hirschman Index (HHI)
+        weights = df['portfolio_percentage'] / 100
+        hhi = (weights ** 2).sum()
+        # Convert to diversification score (0-100, higher is better)
+        div_score = max(0, min(100, (1 - hhi) * 100))
+        
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=div_score,
+            title={'text': "Diversification Score"},
+            gauge={
+                'axis': {'range': [0, 100]},
+                'bar': {'color': self.pie_colors[0]},
+                'steps': [
+                    {'range': [0, 33], 'color': 'red'},
+                    {'range': [33, 66], 'color': 'yellow'},
+                    {'range': [66, 100], 'color': 'green'}
+                ]
+            }
+        ))
+        
+        self.update_chart_layout(fig, {
+            'title_font_size': 24
+        })
+        
+        output_path = self.output_dir / "diversification_score.html"
+        fig.write_html(str(output_path))
+        print(f"Saved diversification score to {output_path}")
+        fig.show()
+        return fig
