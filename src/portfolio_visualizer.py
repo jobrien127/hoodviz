@@ -183,24 +183,58 @@ class PortfolioVisualizer:
         # Handle crypto assets and combine stocks/ADRs
         df.loc[df['type'].isin(['stock', 'adr']), 'type'] = 'stocks'  # Combine stocks and ADRs
         
+        # Normalize equity_change to [-1, 1] range for better visualization
+        if not df['equity_change'].empty:
+            max_abs_change = abs(df['equity_change']).max()
+            if max_abs_change != 0:  # Avoid division by zero
+                df['normalized_change'] = df['equity_change'] / max_abs_change
+            else:
+                df['normalized_change'] = df['equity_change']
+        else:
+            df['normalized_change'] = 0
+            
+        # Store original values for hover display
+        df['equity_change_display'] = df['equity_change'].apply(lambda x: f'${x:,.2f}')
+        df['portfolio_percentage_display'] = df['portfolio_percentage'].apply(lambda x: f'{x:.5f}%')
+        
         fig = px.treemap(
             df,
             path=[px.Constant("Portfolio"), 'type', df.index],
             values='equity',        
-            color='equity_change',
-            hover_data=['name', 'quantity', 'price'],
-            color_continuous_scale='RdYlGn',
-            title='Portfolio Treemap Visualization',
+            color='normalized_change',
+            hover_data={
+                'name': True,
+                'quantity': ':.8f',
+                'price': ':.2f',
+                'equity_change_display': True,
+                'portfolio_percentage_display': True
+            },
+            color_continuous_scale=[(0, "red"), (0.5, "white"), (1, "green")],
+            color_continuous_midpoint=0,  # Center the color scale at 0
+            title='Portfolio Performance Treemap',
             template=self.plotly_theme
         )
         
+        # Update hover template to show actual equity change and portfolio percentage
+        fig.update_traces(
+            hovertemplate="<b>%{label}</b><br>" +
+                         "Type: %{parent}<br>" +
+                         "Name: %{customdata[0]}<br>" +
+                         "Quantity: %{customdata[1]}<br>" +
+                         "Price: $%{customdata[2]}<br>" +
+                         "Change: %{customdata[3]}<br>" +
+                         "Portfolio %: %{customdata[4]}<br>" +
+                         "<extra></extra>"
+        )
+        
         self.update_chart_layout(fig, {
-            'title_font_size': 24
+            'title_font_size': 24,
+            'coloraxis_colorbar_title': 'Relative Performance'
         })
         
         output_path = self.output_dir / "portfolio_treemap.html"
         fig.write_html(str(output_path))
-        print(f"Saved treemap visualization to {output_path}")
+        print(f"Saved performance treemap visualization to {output_path}")
         fig.show()
         return fig
 
