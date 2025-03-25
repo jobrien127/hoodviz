@@ -60,6 +60,9 @@ def main():
         
         print("\n4. Creating treemap visualization...")
         visualizer.treemap_visualization()
+
+        print("\n4. Creating treemap performance visualization...")
+        visualizer.treemap_perf_visualization()
         
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         

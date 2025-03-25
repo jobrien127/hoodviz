@@ -3,9 +3,8 @@ import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-import os
 from pathlib import Path
-import io
+import numpy as np
 
 # Set dark style for matplotlib
 plt.style.use('dark_background')
@@ -122,6 +121,9 @@ class PortfolioVisualizer:
         """Create a treemap visualization of portfolio holdings"""
         df = self.portfolio_df.copy()
         
+        # Handle crypto assets and combine stocks/ADRs
+        df.loc[df['type'].isin(['stock', 'adr']), 'type'] = 'stocks'  # Combine stocks and ADRs
+        
         fig = px.treemap(
             df,
             path=[px.Constant("Portfolio"), 'type', df.index],
@@ -129,6 +131,35 @@ class PortfolioVisualizer:
             color='portfolio_percentage',
             hover_data=['name', 'quantity', 'price'],
             color_continuous_scale='Viridis',
+            title='Portfolio Treemap Visualization',
+            template=self.plotly_theme
+        )
+        
+        self.update_chart_layout(fig, {
+            'title_font_size': 24
+        })
+        
+        output_path = self.output_dir / "portfolio_treemap.html"
+        fig.write_html(str(output_path))
+        print(f"Saved treemap visualization to {output_path}")
+        fig.show()
+        return fig
+    
+    def treemap_perf_visualization(self):
+        """Create a treemap visualization of portfolio holdings and performance"""
+        df = self.portfolio_df.copy()
+        
+        # Handle crypto assets and combine stocks/ADRs
+        df.loc[df['type'].isin(['stock', 'adr']), 'type'] = 'stocks'  # Combine stocks and ADRs
+        df['equity_change'] = np.where(df['type'] == 'crypto', df['equity'] - df['price'] * df['quantity'], df['equity_change'])
+        
+        fig = px.treemap(
+            df,
+            path=[px.Constant("Portfolio"), 'type', df.index],
+            values='equity',        
+            color='equity_change',
+            hover_data=['name', 'quantity', 'price'],
+            color_continuous_scale='RdYlGn',
             title='Portfolio Treemap Visualization',
             template=self.plotly_theme
         )

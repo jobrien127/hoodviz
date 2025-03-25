@@ -69,42 +69,90 @@ def login_to_robinhood():
         return False
 
 def get_portfolio_data(force_refresh=False):
-    """
-    Fetch portfolio data from Robinhood or cache
-    Args:
-        force_refresh (bool): If True, bypass cache and fetch fresh data
-    """
-    if not force_refresh:
-        cached_data = _load_from_cache()
-        if cached_data is not None:
-            print("Using cached portfolio data (less than 24 hours old)")
-            return cached_data
+        """
+        Fetch portfolio data from Robinhood or cache
+        Args:
+            force_refresh (bool): If True, bypass cache and fetch fresh data
+        """
+        if not force_refresh:
+            cached_data = _load_from_cache()
+            if cached_data is not None:
+                print("Using cached portfolio data (less than 24 hours old)")
+                return cached_data
 
-    try:
-        my_stocks = rh.build_holdings()
-        if not my_stocks:
-            print("No stock positions found")
-            return pd.DataFrame()
+        try:
+            # Get stock holdings
+            my_stocks = rh.build_holdings()
+            if not my_stocks:
+                print("No stock positions found")
+                stocks_df = pd.DataFrame()
+            else:
+                # Convert to DataFrame for easier manipulation
+                stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
+                stocks_df['type'] = stocks_df['type'].fillna('stock')  # Ensure stock type is set
+                
+            # Get crypto holdings
+            crypto_positions = rh.get_crypto_positions()
+            crypto_holdings = {}
             
-        # Convert to DataFrame for easier manipulation
-        stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
-        
-        # Convert numeric columns
-        numeric_cols = ['price', 'quantity', 'average_buy_price', 'equity', 'percent_change', 'equity_change']
-        for col in numeric_cols:
-            if col in stocks_df.columns:
-                stocks_df[col] = pd.to_numeric(stocks_df[col])
-        
-        portfolio_df = stocks_df
-        
-        # Save to cache
-        _save_to_cache(portfolio_df)
-        
-        return portfolio_df
-        
-    except Exception as e:
-        print(f"Error fetching portfolio data: {e}")
-        return pd.DataFrame()
+            if crypto_positions:  # Check if positions exist
+                for position in crypto_positions:
+                    try:
+                        quantity = float(position.get('quantity', 0))
+                        if quantity > 0:  # Only include non-zero positions
+                            symbol = position.get('currency', {}).get('code')
+                            if not symbol:
+                                continue
+                                
+                            # Get current crypto price
+                            quote = rh.get_crypto_quote(symbol)
+                            if quote and isinstance(quote, dict):
+                                price = float(quote.get('mark_price', 0))
+                                equity = quantity * price
+                                
+                                cost_bases = position.get('cost_bases', [])
+                                avg_cost = 0
+                                if cost_bases and len(cost_bases) > 0:
+                                    direct_cost = float(cost_bases[0].get('direct_cost_basis', 0))
+                                    direct_quantity = float(cost_bases[0].get('direct_quantity', 1))
+                                    if direct_quantity > 0:
+                                        avg_cost = direct_cost / direct_quantity
+                                
+                                crypto_holdings[symbol] = {
+                                    'price': price,
+                                    'quantity': quantity,
+                                    'equity': equity,
+                                    'name': position.get('currency', {}).get('name', symbol),
+                                    'type': 'crypto',
+                                    'average_buy_price': avg_cost
+                                }
+                    except (TypeError, ValueError, KeyError) as e:
+                        print(f"Error processing crypto position: {e}")
+                        continue
+
+            # Convert crypto to DataFrame
+            if crypto_holdings:
+                crypto_df = pd.DataFrame.from_dict(crypto_holdings, orient='index')
+                # Combine stocks and crypto
+                portfolio_df = pd.concat([stocks_df, crypto_df]) if not stocks_df.empty else crypto_df
+            else:
+                print("No crypto positions found")
+                portfolio_df = stocks_df
+                
+            # Convert numeric columns
+            numeric_cols = ['price', 'quantity', 'average_buy_price', 'equity', 'percent_change', 'equity_change']
+            for col in numeric_cols:
+                if col in portfolio_df.columns:
+                    portfolio_df[col] = pd.to_numeric(portfolio_df[col], errors='coerce')
+            
+            # Save to cache
+            _save_to_cache(portfolio_df)
+            
+            return portfolio_df
+            
+        except Exception as e:
+            print(f"Error fetching portfolio data: {e}")
+            return pd.DataFrame()
 
 def logout_from_robinhood():
     """
