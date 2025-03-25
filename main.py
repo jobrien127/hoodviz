@@ -8,12 +8,19 @@ visualizations to help understand your asset diversification.
 
 import os
 import sys
+import argparse
 from pathlib import Path
 from src.robinhood_client import login_to_robinhood, get_portfolio_data, logout_from_robinhood
 from src.portfolio_visualizer import PortfolioVisualizer
 
 def main():
     """Main function to run the portfolio visualization tool"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Robinhood Portfolio Visualization Tool')
+    parser.add_argument('--force-refresh', '-f', action='store_true',
+                       help='Force refresh of portfolio data from Robinhood (bypass cache)')
+    args = parser.parse_args()
+    
     print("Robinhood Portfolio Visualization Tool")
     print("=====================================")
     
@@ -25,7 +32,7 @@ def main():
     try:
         # Fetch portfolio data
         print("\nFetching your portfolio data...")
-        portfolio_df = get_portfolio_data()
+        portfolio_df = get_portfolio_data(force_refresh=args.force_refresh)
         
         if portfolio_df.empty:
             print("No portfolio data found. Make sure you have positions in your Robinhood account.")
@@ -45,28 +52,14 @@ def main():
         print("\nGenerating visualizations...")
         visualizer = PortfolioVisualizer(portfolio_df)
         
-        # print("\n1. Creating portfolio metrics dashboard...")
-        # visualizer.portfolio_metrics_dashboard()
-        
         print("\n2. Creating pie chart by symbol...")
         visualizer.pie_chart_by_symbol()
 
         print("\n3. Creating etp vs stocks/adr...")
         visualizer.compare_etp_vs_stocks()
         
-        # print("\n3. Creating pie chart by asset type...")
-        # visualizer.pie_chart_by_asset_type()
-        
         print("\n4. Creating treemap visualization...")
         visualizer.treemap_visualization()
-        
-        # print("\n5. Creating bar chart of top holdings...")
-        # visualizer.bar_chart_top_holdings()
-
-        # print("\n6. Creating sector breakdown for large cap holdings...")
-        # visualizer.sector_breakdown_large_cap()
-
-        # visualizer.display_miscellaneous_stocks()
         
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         

@@ -4,6 +4,39 @@ import time
 from dotenv import load_dotenv
 import robin_stocks.robinhood as rh
 import pandas as pd
+from pathlib import Path
+from datetime import datetime, timedelta
+import pickle
+
+# Create cache directory if it doesn't exist
+CACHE_DIR = Path(__file__).parent.parent / "cache"
+CACHE_DIR.mkdir(exist_ok=True)
+PORTFOLIO_CACHE_FILE = CACHE_DIR / "portfolio_cache.pkl"
+
+def _save_to_cache(data):
+    """Save portfolio data and timestamp to cache"""
+    cache_data = {
+        'timestamp': datetime.now(),
+        'data': data
+    }
+    with open(PORTFOLIO_CACHE_FILE, 'wb') as f:
+        pickle.dump(cache_data, f)
+
+def _load_from_cache():
+    """Load portfolio data from cache if it exists and is less than 24 hours old"""
+    if not PORTFOLIO_CACHE_FILE.exists():
+        return None
+        
+    try:
+        with open(PORTFOLIO_CACHE_FILE, 'rb') as f:
+            cache_data = pickle.load(f)
+            
+        # Check if cache is less than 24 hours old
+        if datetime.now() - cache_data['timestamp'] < timedelta(hours=24):
+            return cache_data['data']
+    except Exception as e:
+        print(f"Error reading cache: {e}")
+    return None
 
 def login_to_robinhood():
     """
@@ -35,92 +68,43 @@ def login_to_robinhood():
         print("Please make sure you entered the correct SMS code.")
         return False
 
-def get_portfolio_data():
+def get_portfolio_data(force_refresh=False):
     """
-    Fetch portfolio data from Robinhood
+    Fetch portfolio data from Robinhood or cache
+    Args:
+        force_refresh (bool): If True, bypass cache and fetch fresh data
     """
-    # Get stock positions
-    my_stocks = rh.build_holdings()
-    
-    # Convert to DataFrame for easier manipulation
-    stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
-    
-    # Convert numeric columns
-    numeric_cols = ['price', 'quantity', 'average_buy_price', 'equity', 'percent_change', 'equity_change']
-    for col in numeric_cols:
-        if col in stocks_df.columns:
-            stocks_df[col] = pd.to_numeric(stocks_df[col])
-    
-    # Add asset type and fetch sector information for stocks
-    stocks_df['asset_type'] = 'stock'
-    
-    # Fetch sector information for each stock
-    sectors = {}
-    for symbol in stocks_df.index:
-        try:
-            fundamentals = rh.get_fundamentals(symbol)[0]
-            sectors[symbol] = fundamentals.get('sector', 'Unknown')
-        except Exception as e:
-            print(f"Could not fetch sector for {symbol}: {e}")
-            sectors[symbol] = 'Unknown'
-    
-    # Add sector information to DataFrame
-    stocks_df['sector'] = pd.Series(sectors)
-    
-    # Get crypto positions
+    if not force_refresh:
+        cached_data = _load_from_cache()
+        if cached_data is not None:
+            print("Using cached portfolio data (less than 24 hours old)")
+            return cached_data
+
     try:
-        my_crypto = rh.get_crypto_positions()
-        crypto_data = {}
-        
-        for position in my_crypto:
-            if float(position['quantity_available']) > 0:
-                symbol = position['currency']['code']
-                quantity = float(position['quantity_available'])
-                
-                # Get current price
-                crypto_quote = rh.get_crypto_quote(symbol)
-                price = float(crypto_quote['mark_price'])
-                
-                # Calculate values
-                equity = price * quantity
-                
-                crypto_data[symbol] = {
-                    'price': price,
-                    'quantity': quantity,
-                    'equity': equity,
-                    'name': position['currency']['name'],
-                    'asset_type': 'crypto',
-                    'sector': 'Cryptocurrency'  # Add sector for crypto
-                }
-        
-        # Convert to DataFrame
-        if crypto_data:
-            crypto_df = pd.DataFrame.from_dict(crypto_data, orient='index')
+        my_stocks = rh.build_holdings()
+        if not my_stocks:
+            print("No stock positions found")
+            return pd.DataFrame()
             
-            # Combine stocks and crypto
-            portfolio_df = pd.concat([stocks_df, crypto_df])
-        else:
-            portfolio_df = stocks_df
-    except Exception as e:
-        print(f"Error fetching crypto positions: {e}")
+        # Convert to DataFrame for easier manipulation
+        stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
+        
+        # Convert numeric columns
+        numeric_cols = ['price', 'quantity', 'average_buy_price', 'equity', 'percent_change', 'equity_change']
+        for col in numeric_cols:
+            if col in stocks_df.columns:
+                stocks_df[col] = pd.to_numeric(stocks_df[col])
+        
         portfolio_df = stocks_df
-    
-    # Classify stocks into asset types based on market cap
-    for symbol in portfolio_df[portfolio_df['asset_type'] == 'stock'].index:
-        try:
-            fundamentals = rh.get_fundamentals(symbol)[0]
-            market_cap = float(fundamentals.get('market_cap', 0))
-            
-            if market_cap >= 10e9:  # $10 billion or more
-                portfolio_df.at[symbol, 'asset_type'] = 'Large Cap'
-            elif market_cap >= 2e9:  # $2 billion to $10 billion
-                portfolio_df.at[symbol, 'asset_type'] = 'Mid Cap'
-            else:
-                portfolio_df.at[symbol, 'asset_type'] = 'Small Cap'
-        except Exception as e:
-            print(f"Could not determine market cap for {symbol}: {e}")
-    
-    return portfolio_df
+        
+        # Save to cache
+        _save_to_cache(portfolio_df)
+        
+        return portfolio_df
+        
+    except Exception as e:
+        print(f"Error fetching portfolio data: {e}")
+        return pd.DataFrame()
 
 def logout_from_robinhood():
     """
