@@ -383,3 +383,78 @@ class PortfolioVisualizer:
         fig.show()
         
         return fig
+
+    def compare_etp_vs_stocks(self):
+        """Create side-by-side pie charts comparing ETPs vs Stocks/ADRs"""
+        df = self.portfolio_df.copy()
+        
+        # Filter out crypto (NaN types) and separate ETPs from Stocks/ADRs
+        df = df.dropna(subset=['type'])
+        etp_df = df[df['type'] == 'etp']
+        stocks_df = df[df['type'].isin(['stock', 'adr'])]
+        
+        # Create subplots for the two pie charts
+        fig = go.Figure()
+        
+        # ETP Chart
+        etp_by_symbol = etp_df.groupby(etp_df.index)['equity'].sum()
+        etp_total = etp_by_symbol.sum()
+        
+        fig.add_trace(go.Pie(
+            values=etp_by_symbol,
+            labels=etp_by_symbol.index,
+            name="ETPs",
+            domain=dict(x=[0, 0.45]),
+            title="ETP Allocation",
+            textfont=dict(color='white'),
+            hole=0.3
+        ))
+        
+        # Stocks/ADRs Chart
+        stocks_by_symbol = stocks_df.groupby(stocks_df.index)['equity'].sum()
+        stocks_total = stocks_by_symbol.sum()
+        
+        fig.add_trace(go.Pie(
+            values=stocks_by_symbol,
+            labels=stocks_by_symbol.index,
+            name="Stocks/ADRs",
+            domain=dict(x=[0.55, 1]),
+            title="Stocks/ADRs Allocation",
+            textfont=dict(color='white'),
+            hole=0.3
+        ))
+        
+        # Update layout
+        self.update_chart_layout(fig, {
+            'title': 'ETPs vs Stocks/ADRs Comparison',
+            'title_x': 0.5,
+            'title_font_size': 24,
+            'showlegend': True,
+            'height': 600,
+            'annotations': [
+                dict(
+                    text=f'Total ETP Value: ${etp_total:,.2f}',
+                    x=0.225, y=-0.1,
+                    showarrow=False,
+                    font_size=14,
+                    font_color='white'
+                ),
+                dict(
+                    text=f'Total Stocks/ADRs Value: ${stocks_total:,.2f}',
+                    x=0.775, y=-0.1,
+                    showarrow=False,
+                    font_size=14,
+                    font_color='white'
+                )
+            ]
+        })
+        
+        # Save interactive HTML
+        output_path = self.output_dir / "etp_vs_stocks_comparison.html"
+        fig.write_html(str(output_path))
+        print(f"Saved ETP vs Stocks comparison to {output_path}")
+        
+        # Display the chart
+        fig.show()
+        
+        return fig

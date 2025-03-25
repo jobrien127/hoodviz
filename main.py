@@ -50,6 +50,9 @@ def main():
         
         print("\n2. Creating pie chart by symbol...")
         visualizer.pie_chart_by_symbol()
+
+        print("\n3. Creating etp vs stocks/adr...")
+        visualizer.compare_etp_vs_stocks()
         
         # print("\n3. Creating pie chart by asset type...")
         # visualizer.pie_chart_by_asset_type()
