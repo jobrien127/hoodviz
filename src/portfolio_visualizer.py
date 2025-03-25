@@ -314,3 +314,60 @@ class PortfolioVisualizer:
         fig.show()
         
         return fig
+
+    def bar_chart_by_symbol(self, min_percentage=0.0):
+        """
+        Create a bar chart of portfolio allocation by symbol
+        Holdings below min_percentage will be grouped as 'Other'
+        """
+        df = self.portfolio_df.copy()
+        
+        # Group small holdings
+        small_holdings = df[df['portfolio_percentage'] < min_percentage]
+        if not small_holdings.empty:
+            other_pct = small_holdings['portfolio_percentage'].sum()
+            df = df[df['portfolio_percentage'] >= min_percentage]
+            
+            if other_pct > 0:
+                other_row = pd.DataFrame({
+                    'equity': [small_holdings['equity'].sum()],
+                    'portfolio_percentage': [other_pct],
+                    'name': ['Other (< 1%)']
+                })
+                df = pd.concat([df, other_row])
+        
+        df = df.sort_values('portfolio_percentage', ascending=True)  # Sort ascending for better visualization
+        
+        fig = go.Figure(data=[
+            go.Bar(
+                x=df['portfolio_percentage'],
+                y=df.index,
+                orientation='h',
+                text=[f'{pct:.2f}%' for pct in df['portfolio_percentage']],
+                textposition='auto',
+                hovertemplate='<b>%{y}</b><br>' +
+                             'Portfolio %: %{x:.2f}%<br>' +
+                             'Equity: $%{customdata[0]:,.2f}<br>' +
+                             'Name: %{customdata[1]}<extra></extra>',
+                customdata=df[['equity', 'name']].values,
+                marker=dict(color=self.pie_colors[0])  # Use first color from our palette
+            )
+        ])
+        
+        # Update layout for better readability
+        self.update_chart_layout(fig, {
+            'title': 'Portfolio Allocation by Symbol',
+            'title_font_size': 24,
+            'height': max(600, len(df) * 25),  # Dynamic height based on number of symbols
+            'xaxis_title': 'Portfolio Percentage',
+            'yaxis_title': 'Symbol',
+            'yaxis': {'categoryorder': 'total ascending'},  # Sort bars by value
+            'margin': dict(l=20, r=20, t=40, b=20),
+            'bargap': 0.15
+        })
+        
+        output_path = self.output_dir / "portfolio_by_symbol_bar.html"
+        fig.write_html(str(output_path))
+        print(f"Saved bar chart by symbol to {output_path}")
+        fig.show()
+        return fig
