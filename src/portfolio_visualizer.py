@@ -16,29 +16,6 @@ class PortfolioVisualizer:
         self.output_dir = Path(__file__).parent.parent / "visualizations"
         self.output_dir.mkdir(exist_ok=True)
 
-        # Display portfolio DataFrame
-        pd.set_option('display.max_rows', None)  # Show all rows
-        pd.set_option('display.max_columns', None)  # Show all columns
-        pd.set_option('display.width', None)  # Don't wrap wide columns
-        pd.set_option('display.float_format', lambda x: '%.5f' % x)  # Format floats to 20 decimal places
-        
-        print("\nDataFrame Information:")
-        print("=" * 80)
-        print("\nDataFrame Attributes:")
-        print(f"Shape: {portfolio_df.shape}")
-        print(f"Columns: {portfolio_df.columns.tolist()}")
-        # print(f"Index: {portfolio_df.index.tolist()}")
-        print(f"\nData Types:\n{portfolio_df.dtypes}")
-        # print("\nSample Data:")
-        # print(portfolio_df.head())
-        # print("\nDataFrame Description:")
-        # print(portfolio_df.describe())
-        
-        print("\nCurrent Portfolio Holdings:")
-        print("=" * 80)
-        print(portfolio_df)
-        print("\nTotal Portfolio Value: ${:,.5f}".format(portfolio_df['equity'].sum()))
-        
         # Set dark theme configurations
         self.plotly_theme = "plotly_dark"
         
@@ -82,9 +59,9 @@ class PortfolioVisualizer:
 
     def calculate_percentages(self):
         """Calculate percentage of portfolio for each holding"""
-        total_equity = self.portfolio_df['equity'].sum().round(2)  # Total always in 2 decimals
+        total_equity = self.portfolio_df['equity'].sum()
         self.portfolio_df['portfolio_percentage'] = (self.portfolio_df['equity'] / total_equity * 100)
-        # Round percentages based on asset type
+        # # Round percentages based on asset type
         crypto_mask = self.portfolio_df['type'] == 'crypto'
         self.portfolio_df.loc[crypto_mask, 'portfolio_percentage'] = self.portfolio_df.loc[crypto_mask, 'portfolio_percentage'].round(20)
         self.portfolio_df.loc[~crypto_mask, 'portfolio_percentage'] = self.portfolio_df.loc[~crypto_mask, 'portfolio_percentage'].round(2)
@@ -375,6 +352,7 @@ class PortfolioVisualizer:
     def risk_return_scatter(self):
         """Create a scatter plot showing risk vs return for each holding"""
         df = self.portfolio_df.copy()
+        df = df[df['type'] != 'cash']
         
         fig = px.scatter(
             df,
@@ -404,35 +382,10 @@ class PortfolioVisualizer:
         fig.show()
         return fig
 
-    def asset_type_distribution(self):
-        """Create a sunburst chart showing distribution across asset types"""
-        df = self.portfolio_df.copy()
-        
-        # Calculate total value per asset type
-        type_totals = df.groupby('type')['equity'].sum().reset_index()
-        
-        fig = px.sunburst(
-            type_totals,
-            path=['type'],
-            values='equity',
-            title='Asset Type Distribution',
-            template=self.plotly_theme,
-            color_discrete_sequence=self.pie_colors
-        )
-        
-        self.update_chart_layout(fig, {
-            'title_font_size': 24
-        })
-        
-        output_path = self.output_dir / "asset_type_distribution.html"
-        fig.write_html(str(output_path))
-        print(f"Saved asset type distribution to {output_path}")
-        fig.show()
-        return fig
-
     def portfolio_weight_changes(self):
         """Create a waterfall chart showing how portfolio weights have changed"""
         df = self.portfolio_df.copy()
+        df = df[df['type'] != 'cash']
         
         fig = go.Figure(go.Waterfall(
             name="Portfolio Changes",
@@ -456,40 +409,5 @@ class PortfolioVisualizer:
         output_path = self.output_dir / "portfolio_weight_changes.html"
         fig.write_html(str(output_path))
         print(f"Saved portfolio weight changes to {output_path}")
-        fig.show()
-        return fig
-
-    def diversification_score(self):
-        """Create a gauge chart showing portfolio diversification score"""
-        df = self.portfolio_df.copy()
-        
-        # Calculate Herfindahl-Hirschman Index (HHI)
-        weights = df['portfolio_percentage'] / 100
-        hhi = (weights ** 2).sum()
-        # Convert to diversification score (0-100, higher is better)
-        div_score = max(0, min(100, (1 - hhi) * 100))
-        
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=div_score,
-            title={'text': "Diversification Score"},
-            gauge={
-                'axis': {'range': [0, 100]},
-                'bar': {'color': self.pie_colors[0]},
-                'steps': [
-                    {'range': [0, 33], 'color': 'red'},
-                    {'range': [33, 66], 'color': 'yellow'},
-                    {'range': [66, 100], 'color': 'green'}
-                ]
-            }
-        ))
-        
-        self.update_chart_layout(fig, {
-            'title_font_size': 24
-        })
-        
-        output_path = self.output_dir / "diversification_score.html"
-        fig.write_html(str(output_path))
-        print(f"Saved diversification score to {output_path}")
         fig.show()
         return fig

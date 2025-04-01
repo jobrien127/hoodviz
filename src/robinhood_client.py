@@ -35,7 +35,7 @@ def _load_from_cache():
         if datetime.now() - cache_data['timestamp'] < timedelta(hours=24):
             return cache_data['data']
     except Exception as e:
-        print(f"Error reading cache: {e}")
+        print(f"\nError reading cache: {e}")
     return None
 
 def login_to_robinhood():
@@ -47,10 +47,10 @@ def login_to_robinhood():
     password = os.getenv("ROBINHOOD_PASSWORD")
     
     if not username or not password:
-        print("Error: Robinhood credentials not found in .env file")
+        print("\nError: Robinhood credentials not found in .env file")
         return False
     
-    print("Initiating login to Robinhood...")
+    print("\nInitiating login to Robinhood...")
     
     try:
         # Initial login attempt to trigger SMS
@@ -60,37 +60,49 @@ def login_to_robinhood():
                 store_session=True,
                 by_sms=False)  # Enable SMS authentication
         
-        print("Successfully logged in to Robinhood!")
+        print("\nSuccessfully logged in to Robinhood!")
         return True
             
     except Exception as e:
-        print(f"Login failed: {str(e)}")
-        print("Please make sure you entered the correct SMS code.")
+        print(f"\nLogin failed: {str(e)}")
+        print("\nPlease make sure you entered the correct SMS code.")
         return False
 
-def get_portfolio_data(force_refresh=False):
+def get_portfolio_data(force_refresh=False, verbose=False):
         """
         Fetch portfolio data from Robinhood or cache
         Args:
             force_refresh (bool): If True, bypass cache and fetch fresh data
         """
+        # Display DataFrame Settings for printing
+        pd.set_option('display.max_rows', None)  # Show all rows
+        pd.set_option('display.max_columns', None)  # Show all columns
+        pd.set_option('display.width', None)  # Don't wrap wide columns
+        pd.set_option('display.float_format', lambda x: '%.5f' % x)  # Format floats to 20 decimal places
+
         if not force_refresh:
             cached_data = _load_from_cache()
             if cached_data is not None:
-                print("Using cached portfolio data (less than 24 hours old)")
+                print("\nUsing cached portfolio data (less than 24 hours old)")
                 return cached_data
 
         try:
             # Get stock holdings
             my_stocks = rh.build_holdings()
             if not my_stocks:
-                print("No stock positions found")
+                print("\nNo stock positions found")
                 stocks_df = pd.DataFrame()
             else:
                 # Convert to DataFrame for easier manipulation
                 stocks_df = pd.DataFrame.from_dict(my_stocks, orient='index')
-                stocks_df['type'] = stocks_df['type'].fillna('stock')  # Ensure stock type is set
-                
+
+            #  Get profile data
+            profile = rh.build_user_profile()
+            if not profile:
+                print("\nNo profile data found")
+            else:
+                stocks_df.loc['CASH'] = [1, profile['cash'], 1, profile['cash'], 0, 0, 0, 'cash', 'cash', 'cash', 1, None]
+
             # Get crypto holdings with high precision
             crypto_positions = rh.get_crypto_positions()
             crypto_holdings = {}
@@ -118,8 +130,6 @@ def get_portfolio_data(force_refresh=False):
                                     if direct_quantity > 0:
                                         avg_cost = round(direct_cost / direct_quantity, 20)
 
-                                print("Price:" , price, " Quantity:", quantity, " Equity:", equity, " Avg Cost:", avg_cost)
-
                                 crypto_holdings[symbol] = {
                                     'price': price,
                                     'quantity': quantity,
@@ -130,16 +140,17 @@ def get_portfolio_data(force_refresh=False):
                                     'equity_change': round(equity - (quantity * avg_cost), 20)
                                 }
                     except (TypeError, ValueError, KeyError) as e:
-                        print(f"Error processing crypto position: {e}")
+                        print(f"\nError processing crypto position: {e}")
                         continue
 
             # Convert crypto to DataFrame
             if crypto_holdings:
                 crypto_df = pd.DataFrame.from_dict(crypto_holdings, orient='index')
+
                 # Combine stocks and crypto
                 portfolio_df = pd.concat([stocks_df, crypto_df]) if not stocks_df.empty else crypto_df
             else:
-                print("No crypto positions found")
+                print("\nNo crypto positions found")
                 portfolio_df = stocks_df
                 
             # Convert numeric columns - regular precision for stocks, high precision for crypto
@@ -155,11 +166,13 @@ def get_portfolio_data(force_refresh=False):
             
             # Save to cache
             _save_to_cache(portfolio_df)
+
+            print(f"Portfolio:\n{'='*80}\n{portfolio_df}") if verbose else None
             
             return portfolio_df
             
         except Exception as e:
-            print(f"Error fetching portfolio data: {e}")
+            print(f"\nError fetching portfolio data: {e}")
             return pd.DataFrame()
 
 def logout_from_robinhood():
@@ -167,11 +180,9 @@ def logout_from_robinhood():
     Log out from Robinhood
     """
     rh.logout()
-    print("Logged out from Robinhood")
+    print("\nLogged out from Robinhood")
 
 if __name__ == "__main__":
     if login_to_robinhood():
         portfolio_df = get_portfolio_data()
-        print("\nPortfolio Summary:")
-        print(portfolio_df[['name', 'asset_type', 'quantity', 'price', 'equity']])
         logout_from_robinhood()

@@ -6,8 +6,7 @@ This script fetches your Robinhood portfolio data and creates
 visualizations to help understand your asset diversification.
 """
 
-import os
-import sys
+import pandas as pd
 import argparse
 from pathlib import Path
 from src.robinhood_client import login_to_robinhood, get_portfolio_data, logout_from_robinhood
@@ -19,10 +18,11 @@ def main():
     parser = argparse.ArgumentParser(description='Robinhood Portfolio Visualization Tool')
     parser.add_argument('--force-refresh', '-f', action='store_true',
                        help='Force refresh of portfolio data from Robinhood (bypass cache)')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
     args = parser.parse_args()
     
-    print("Robinhood Portfolio Visualization Tool")
-    print("=====================================")
+    print("\nRobinhood Portfolio Visualization Tool")
+    print("\n=====================================")
     
     # Login to Robinhood
     print("\nLogging in to Robinhood...")
@@ -31,22 +31,16 @@ def main():
     
     try:
         # Fetch portfolio data
-        print("\nFetching your portfolio data...")
-        portfolio_df = get_portfolio_data(force_refresh=args.force_refresh)
+        print("\n\nFetching your portfolio data...")
+        portfolio_df = get_portfolio_data(force_refresh=args.force_refresh, verbose=args.verbose)
         
         if portfolio_df.empty:
-            print("No portfolio data found. Make sure you have positions in your Robinhood account.")
+            print("\nNo portfolio data found. Make sure you have positions in your Robinhood account.")
             return
+
+        print("\nTotal Portfolio Value: ${:,.5f}".format(portfolio_df['equity'].sum()))
         
         print(f"\nSuccessfully retrieved {len(portfolio_df)} holdings")
-        
-        # Print portfolio summary
-        total_value = portfolio_df['equity'].sum()
-        print(f"\nTotal Portfolio Value: ${total_value:.2f}")
-        print("\nTop 5 Holdings:")
-        top_holdings = portfolio_df.sort_values('equity', ascending=False).head(5)
-        for idx, row in top_holdings.iterrows():
-            print(f"  {idx} ({row['name']}): ${row['equity']:.2f} ({(row['equity']/total_value)*100:.2f}%)")
         
         # Create visualizations
         print("\nGenerating visualizations...")
@@ -70,14 +64,8 @@ def main():
         print("\n7. Creating risk-return scatter plot...")
         visualizer.risk_return_scatter()
 
-        print("\n8. Creating asset type distribution...")
-        visualizer.asset_type_distribution()
-
         print("\n9. Creating portfolio weight changes...")
         visualizer.portfolio_weight_changes()
-
-        print("\n10. Creating diversification score...")
-        visualizer.diversification_score()
 
         print("\nVisualizations complete! All charts have been saved to the 'visualizations' folder.")
         
